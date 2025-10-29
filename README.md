@@ -34,7 +34,7 @@ We present **URSA** (**U**niform disc**R**ete diffu**S**ion with metric p**A**th
 
 | Model | Resolution | Data | Weight | GenEval | DPGBench |
 |:-----:|:----------:|:----:|:------:|:-------:|:--------:|
-| URSA-1.7B-IBQ1024 | 1024x1024 | 30M | [🤗 HF link](https://huggingface.co/BAAI/URSA-1.7B-IBQ1024) | 0.80 | 86.0 |
+| URSA-1.7B-IBQ1024 | 1024x1024 | 30M | Coming Soon | 0.80 | 86.0 |
 
 ### 🎬 Text to Video
 

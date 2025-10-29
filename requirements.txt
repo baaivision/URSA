@@ -1,0 +1,10 @@
+torch
+diffusers
+transformers
+accelerate
+imageio
+imageio-ffmpeg
+omegaconf
+wandb
+scipy
+codewithgpu

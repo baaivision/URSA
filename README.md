@@ -5,7 +5,7 @@
 <p align="center">
 <a href="https://arxiv.org/abs/2510.24717"><img src="https://img.shields.io/badge/ArXiv-2510.24717-%23840707.svg" alt="ArXiv"></a>
 <a href="https://huggingface.co/spaces/BAAI/nova-d48w1024-osp480"><img src="https://img.shields.io/badge/🤗 Demo-TI2V-%26840707.svg" alt="T2VDemo"></a>
-<a href="http://bitterdhg.github.io/URSA_page"><img src="https://img.shields.io/badge/Webpage-URSA-%237CB4F7.svg" alt="Project"></a>
+<a href="http://bitterdhg.github.io/URSA_page"><img src="https://img.shields.io/badge/Project-URSA-%237CB4F7.svg" alt="Project"></a>
 </p>
 
 <p align="center">
@@ -36,7 +36,7 @@ We present **URSA** (**U**niform disc**R**ete diffu**S**ion with metric p**A**th
 
 | Model | Resolution | Data | Weight | GenEval | DPGBench |
 |:-----:|:----------:|:----:|:------:|:-------:|:--------:|
-| URSA-1.7B-IBQ1024 | 1024x1024 | 30M | Coming Soon | 0.80 | 86.0 |
+| URSA-1.7B-IBQ1024 | 1024x1024 | 30M | [🤗 HF link](https://huggingface.co/BAAI/URSA-1.7B-IBQ1024) | 0.80 | 86.0 |
 
 ### 🎬 Text to Video
 

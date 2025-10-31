@@ -82,9 +82,9 @@ examples = [
 if __name__ == "__main__":
     args = parse_args()
 
-    device_type = "cuda" if torch.cuda.is_available() else "cpu"
-    device, dtype = torch.device(device_type, args.device), getattr(torch, args.precision.lower())
-    pipe = URSAPipeline.from_pretrained(args.model, torch_dtype=dtype).to(device)
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu", args.device)
+    model_args = {"torch_dtype": getattr(torch, args.precision.lower()), "trust_remote_code": True}
+    pipe = URSAPipeline.from_pretrained(args.model, **model_args).to(device)
 
     # Main Application.
     app = gr.Blocks(css=css, theme="origin").__enter__()

@@ -55,7 +55,7 @@ class FeaturePipe(object):
         outputs = {"latents": [latents]}
         outputs.setdefault("prompt", [label]) if label is not None else None
         outputs.setdefault("prompt", [caption]) if caption is not None else None
-        outputs.setdefault("motion_flow", [inputs["flow"]]) if "flow" in inputs else None
+        outputs.setdefault("motion", [inputs["flow"]]) if "flow" in inputs else None
         return outputs
 
 

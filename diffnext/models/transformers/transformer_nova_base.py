@@ -70,8 +70,8 @@ class Transformer3DModel(nn.Module):
             inputs["x"] = torch.empty(batch_size, *image_size, device=device, dtype=dtype)
         if inputs.get("prompt", None) is not None and self.text_embed:
             inputs["c"].append(self.text_embed(inputs.pop("prompt")))
-        if inputs.get("motion_flow", None) is not None and self.motion_embed:
-            flow, fps = inputs.pop("motion_flow", None), inputs.pop("fps", None)
+        if inputs.get("motion", None) is not None and self.motion_embed:
+            flow, fps = inputs.pop("motion", None), inputs.pop("fps", None)
             flow, fps = [v + v if (add_guidance and v) else v for v in (flow, fps)]
             inputs["c"].append(self.motion_embed(inputs["c"][-1], flow, fps))
         inputs["c"] = torch.cat(inputs["c"], dim=1) if len(inputs["c"]) > 1 else inputs["c"][0]

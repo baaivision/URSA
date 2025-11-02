@@ -54,6 +54,8 @@ class URSATransformer3DModel(ModelMixin, ConfigMixin):
         [setattr(layer.self_attn, "is_causal", False) for layer in self.model.layers]
         [setattr(layer.self_attn, "flex_attn", self.model.flex_attn) for layer in self.model.layers]
         self.lm_head = nn.Linear(hidden_size, lm_head_size, bias=False)
+        self.pipeline_preprocess = lambda inputs: inputs  # Preprocess hook.
+        self.pipeline_postprocess = lambda *args, **kwargs: {}  # Postprocess hook.
 
     def forward(
         self,
@@ -64,6 +66,10 @@ class URSATransformer3DModel(ModelMixin, ConfigMixin):
         lm_head_shift=0,
         **kwargs,
     ) -> Transformer2DModelOutput:
+        if self.training and isinstance(input_ids, dict):  # Prepare training args.
+            inputs, _ = input_ids, self.pipeline_preprocess(input_ids)
+            input_ids, labels, kwargs = inputs.pop("input_ids"), inputs.pop("labels"), inputs
+
         outputs = self.model(input_ids, inputs_embeds=inputs_embeds, **kwargs)
         keep = slice(-logits_to_keep, None) if isinstance(logits_to_keep, int) else logits_to_keep
         head_w = self.lm_head.weight[lm_head_shift:] if lm_head_shift else self.lm_head.weight
@@ -78,6 +84,7 @@ class URSATransformer3DModel(ModelMixin, ConfigMixin):
             lbls = torch.nn.functional.pad(labels[:, 1:], (0, 1), value=-100)
             loss = flash_loss(logits.float(), lbls.flatten()).view(lbls.shape)
             acc1, mask = logits.data.argmax(-1).eq(lbls), lbls.ne(-100)
-            return loss.sum().div(mask.sum()), acc1[mask].float().mean()
+            loss, acc1 = loss.sum().div(mask.sum()), acc1[mask].float().mean()
+            return self.pipeline_postprocess(loss, acc1)
 
         return Transformer2DModelOutput(sample=logits)

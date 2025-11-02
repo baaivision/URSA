@@ -45,7 +45,7 @@ class Trainer(object):
         self.ema = ModelEMA(self.pipe.model, **config.ema.params) if "ema" in config else None
         self.model = self.pipe.configure_model(config)
         param_groups = self.model.parameters()
-        if getattr(config.training, "param_groups", True):
+        if getattr(config.optimizer, "param_groups", True):
             param_groups = engine_utils.get_param_groups(self.model)
         self.optimizer = config_to_object(config.optimizer, params=param_groups)
         self.scheduler = config_to_object(config.lr_scheduler)

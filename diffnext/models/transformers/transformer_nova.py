@@ -22,7 +22,7 @@ from diffnext.models.diffusion_mlp import DiffusionMLP
 from diffnext.models.embeddings import PosEmbed, VideoPosEmbed, RotaryEmbed3D
 from diffnext.models.embeddings import MaskEmbed, MotionEmbed, TextEmbed, LabelEmbed
 from diffnext.models.normalization import AdaLayerNorm
-from diffnext.models.transformers.transformer_3d import Transformer3DModel
+from diffnext.models.transformers.transformer_nova_base import Transformer3DModel
 from diffnext.models.vision_transformer import VisionTransformer
 from diffnext.utils.registry import Registry
 

@@ -64,7 +64,7 @@ class NOVAPipeline(DiffusionPipeline, PipelineMixin):
         image_guidance_scale=0,
         spatiotemporal_guidance_scale=0,
         flow_shift=None,
-        motion_flow=5,
+        motion_score=5,
         negative_prompt=None,
         image=None,
         num_images_per_prompt=1,
@@ -99,8 +99,8 @@ class NOVAPipeline(DiffusionPipeline, PipelineMixin):
                 The spatiotemporal guidance scale.
             flow_shift (float, *optional*)
                 The shift value for the timestep schedule.
-            motion_flow  (float, *optional*, defaults to 5):
-                The motion flow value for video generation.
+            motion_score  (float, *optional*, defaults to 5):
+                The motion score value for video generation.
             negative_prompt (str or List[str], *optional*):
                 The prompt or prompts to guide what to not include in image generation.
             image (numpy.ndarray, *optional*):
@@ -135,7 +135,7 @@ class NOVAPipeline(DiffusionPipeline, PipelineMixin):
         inputs["prompt"] = self.encode_prompt(**dict(_ for _ in inputs.items() if "prompt" in _[0]))
         inputs["latents"] = self.prepare_latents(image, num_images_per_prompt, generator, latents)
         inputs["batch_size"] = len(inputs["prompt"]) // (2 if guidance_scale > 1 else 1)
-        inputs["motion_flow"] = [motion_flow] * inputs["batch_size"]
+        inputs["motion"] = [motion_score] * inputs["batch_size"]
         _, outputs = inputs.pop("self"), self.transformer(inputs)
         if output_type != "latent":
             outputs["x"] = self.image_processor.decode_latents(self.vae, outputs["x"])

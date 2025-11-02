@@ -37,12 +37,14 @@ We present **URSA** (**U**niform disc**R**ete diffu**S**ion with metric p**A**th
 
 | Model | Resolution | Data | Weight | GenEval | DPGBench |
 |:-----:|:----------:|:----:|:------:|:-------:|:--------:|
+| URSA-0.6B-IBQ1024 | 1024x1024 | 30M | [🤗 HF link](https://huggingface.co/BAAI/URSA-0.6B-IBQ1024) | 0.79 | 85.6 |
 | URSA-1.7B-IBQ1024 | 1024x1024 | 30M | [🤗 HF link](https://huggingface.co/BAAI/URSA-1.7B-IBQ1024) | 0.80 | 86.0 |
 
 ### 🎬 Text to Video
 
 | Model | Resolution | Data | Weight | VBench-T2V | VBench-I2V |
 |:-----:|:----------:|:----:|:-------|:----------:|:----------:|
+| URSA-0.6B-FSQ320 | 49x512x320 | 24M | [🤗 HF link](https://huggingface.co/BAAI/URSA-0.6B-FSQ320) | 81.4 | 86.0 |
 | URSA-1.7B-FSQ320 | 49x512x320 | 24M | [🤗 HF link](https://huggingface.co/BAAI/URSA-1.7B-FSQ320) | 82.4 | 86.2 |
 
 ## 📖 Table of Contents
@@ -149,7 +151,7 @@ python scripts/app_ursa_ti2v.py --model "BAAI/URSA-1.7B-FSQ320" --device 0
 - [X] [Gradio Demo](#gradio-demo)
 - [X] [Evaluation Guide](./docs/evaluation.md)
 - [ ] [Training Guide](./docs/training.md)
-- [ ] 0.6B and 4B Model
+- [ ] 4B Model
 
 ## 📖 Citation
 If you find this repository useful, please consider giving a star ⭐ and citation 🦖:

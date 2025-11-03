@@ -60,7 +60,7 @@ We present **URSA** (**U**niform disc**R**ete diffu**S**ion with metric p**A**th
 
 Clone this repository to local disk and install:
 ```bash
-pip install diffusers transformers accelerate imageio imageio-ffmpeg omegaconf wandb
+pip install diffusers transformers>=4.57.1 accelerate imageio imageio-ffmpeg omegaconf wandb
 git clone https://github.com/baaivision/URSA.git
 cd URSA && pip install .
 ```

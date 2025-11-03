@@ -56,13 +56,15 @@ def prepare_datasets(config, accelerator):
             The accelerator instance.
     """
     dataset = config.train_dataloader.params.dataset
-    if os.path.exists(os.path.join(dataset, "METADATA")):
-        with open(os.path.join(dataset, "METADATA"), "r") as f:
-            max_examples = json.load(f)["entries"]
-    else:
-        raise ValueError("Unsupported dataset: " + dataset)
-    config.train_dataloader.params.max_examples = max_examples
-    if "shard_id" not in config.train_dataloader.params:
+    metadata = json.load(open(os.path.join(dataset, "METADATA")))
+    config.train_dataloader.params.max_examples = metadata["entries"]
+    if "batch_size" in metadata:
+        batch_size = metadata["batch_size"][accelerator.process_index]
+        bucket_dataset = dataset + "/" + str(accelerator.process_index).zfill(3)
+        config.train_dataloader.params.dataset = bucket_dataset
+        config.train_dataloader.params.batch_size = config.training.batch_size = batch_size
+        config.training.num_metrics = metadata["num_metrics"]
+    elif "shard_id" not in config.train_dataloader.params:
         # By default, we use dataset shards across all processes.
         config.train_dataloader.params.update(accelerate_utils.get_ddp_shards(accelerator))
 

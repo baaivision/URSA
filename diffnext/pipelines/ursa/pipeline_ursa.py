@@ -43,10 +43,9 @@ class URSAPipeline(DiffusionPipeline, PipelineMixin):
         self.tokenizer = self.register_module(tokenizer, "tokenizer")
         self.transformer = self.register_module(transformer, "transformer")
         self.scheduler = self.register_module(scheduler, "scheduler")
-        self.transformer.sample_scheduler, self.guidance_scale = self.scheduler, 7.0
-        self.tokenizer_args = {"padding": "max_length", "padding_side": "left", "truncation": True}
         self.vae_temporal_stride = self.vae.config.get("temporal_stride", 4)
         self.vae_spatial_stride = self.vae.config.get("spatial_stride", 8)
+        self.tokenizer_args = {"padding": "max_length", "padding_side": "left", "truncation": True}
         self.image_processor = VaeImageProcessor()
 
     @property
@@ -140,9 +139,6 @@ class URSAPipeline(DiffusionPipeline, PipelineMixin):
         Returns:
             URSAPipelineOutput: The pipeline output.
         """
-        self.guidance_scale = guidance_scale
-        self.scheduler.set_shift(flow_shift) if flow_shift else None
-
         # 1. Check inputs
         if latents_shape is None:
             latents_shape = [(num_frames - 1) // self.vae_temporal_stride + 1]
@@ -168,6 +164,7 @@ class URSAPipeline(DiffusionPipeline, PipelineMixin):
         )
 
         # 4. Prepare timesteps
+        self.scheduler.set_shift(flow_shift) if flow_shift else None
         self.scheduler.to(self._device).set_timesteps(num_inference_steps)
 
         # 5. Prepare RoPE positions

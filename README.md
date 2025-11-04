@@ -15,7 +15,7 @@
 
 [CASIA](http://english.ia.cas.cn)<sup>1</sup>, [CASICT](http://english.ict.cas.cn)<sup>2</sup>, [ZJU](https://www.zju.edu.cn/english)<sup>3</sup>, [BAAI](https://www.baai.ac.cn/en)<sup>4</sup><br>
 <sup>*</sup> Equal Contribution, <sup>†</sup> Corresponding Author
-<br><br><image src="assets/model_overview.jpg"/>
+<br><br><image src="assets/model_overview.png"/>
 </div>
 
 We present **URSA** (**U**niform disc**R**ete diffu**S**ion with metric p**A**th), a simple yet powerful framework that bridges the gap with continuous approaches. **URSA** formulates the video generation task as an iterative global refinement of discrete spatiotemporal tokens and scales efficiently to long video generation, requiring fewer inference steps. **URSA** enables multi-task video generation with asynchronous timestep scheduling strategy in one unified model.

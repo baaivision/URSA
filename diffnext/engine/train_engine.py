@@ -43,7 +43,7 @@ class Trainer(object):
         self.pipe = build_pipeline(self.pipe_path, config_to_class(config.pipeline), self.dtype)
         self.pipe = self.pipe.to(device=engine_utils.get_device(config.training.gpu_id))
         self.ema = ModelEMA(self.pipe.model, **config.ema.params) if "ema" in config else None
-        self.model = self.pipe.configure_model(config)
+        self.model = self.pipe.configure_model(config, accelerator, logger)
         param_groups = self.model.parameters()
         if getattr(config.optimizer, "param_groups", True):
             param_groups = engine_utils.get_param_groups(self.model)
@@ -125,7 +125,10 @@ class Trainer(object):
                     continue
                 if isinstance(v, torch.Tensor) and v.requires_grad:
                     losses.append(v)
-                metrics[k] += float(self.accelerator.gather(v).mean()) / accum_steps
+                if k.startswith("metric/"):  # Custom metrics.
+                    metrics[k[len("metric/") :]] += float(v.mean()) / accum_steps
+                elif f"metric/{k}" not in outputs:  # Legacy metrics.
+                    metrics[k] += float(self.accelerator.gather(v).mean()) / accum_steps
             losses = sum(losses[1:], losses[0])
             self.accelerator.accumulate().__enter__()
             self.accelerator.backward(losses)
@@ -174,3 +177,6 @@ class Trainer(object):
                 self.ema.update(self.model)
             if self.global_step % save_every == 0:
                 self.save()
+        self.log_metrics({**stats, **{"step": self.global_step}})
+        self.accelerator.wait_for_everyone()
+        self.accelerator.end_training()

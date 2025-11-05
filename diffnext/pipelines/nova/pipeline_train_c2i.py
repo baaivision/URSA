@@ -42,7 +42,7 @@ class NOVATrainC2IPipeline(DiffusionPipeline, PipelineMixin):
         """Return the trainable model."""
         return self.transformer
 
-    def configure_model(self, config) -> torch.nn.Module:
+    def configure_model(self, config, accelerator=None, logger=None) -> torch.nn.Module:
         """Configure the trainable model."""
         ckpt_lvl = config.model.get("gradient_checkpointing", 0)
         self.model.loss_repeat = config.model.get("loss_repeat", 4)

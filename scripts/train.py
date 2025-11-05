@@ -63,7 +63,8 @@ def prepare_datasets(config, accelerator):
         bucket_dataset = dataset + "/" + str(accelerator.process_index).zfill(3)
         config.train_dataloader.params.dataset = bucket_dataset
         config.train_dataloader.params.batch_size = config.training.batch_size = batch_size
-        config.training.num_metrics = metadata["num_metrics"]
+        if "num_metrics" in metadata:
+            config.training.num_metrics = metadata["num_metrics"]
     elif "shard_id" not in config.train_dataloader.params:
         # By default, we use dataset shards across all processes.
         config.train_dataloader.params.update(accelerate_utils.get_ddp_shards(accelerator))

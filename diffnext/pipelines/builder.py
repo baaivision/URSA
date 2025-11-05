@@ -57,7 +57,10 @@ def get_pipeline_path(
             continue
         os.makedirs(os.path.join(target_path, k), exist_ok=True)
         for _ in os.listdir(os.path.join(pretrained_path, k)):
-            os.symlink(os.path.join(pretrained_path, k, _), os.path.join(target_path, k, _))
+            try:
+                os.symlink(os.path.join(pretrained_path, k, _), os.path.join(target_path, k, _))
+            except FileExistsError:  # Some components may be provided.
+                pass
     module_dict = module_dict.copy() if module_dict is not None else {}
     model_index = module_dict.pop("model_index", os.path.join(pretrained_path, "model_index.json"))
     model_index = json.load(open(model_index))

@@ -45,7 +45,7 @@ class FlexAttentionCausal2D(nn.Module):
     def set_offsets_by_lens(self, lens, flags=None):
         """Set block-wise mask offsets by lengths."""
         self.set_offsets(list(accumulate(type(lens)([0]) + lens if lens[0] != 0 else lens)))
-        self.flags = flags  # Bidirectional flags.
+        self.flags = flags  # Bidirectional flags (-1: lower triangular, 1: full).
 
     def get_mask_mod(self) -> callable:
         """Return the mask modification."""
@@ -54,10 +54,10 @@ class FlexAttentionCausal2D(nn.Module):
         ids = ids.repeat_interleave(counts)
         if self.flags is None:
             return lambda b, h, qi, ki: (qi >= ki) | (ids[qi] == ids[ki])
-        flags = list(self.flags) + [0] * (len(counts) - len(self.flags))
-        flags = torch.as_tensor(flags, device=self.cu_offsets.device, dtype=torch.bool)
+        flags = list(self.flags) + [-1] * (len(counts) - len(self.flags))
+        flags = torch.as_tensor(flags, device=self.cu_offsets.device, dtype=torch.int32)
         flags = flags.repeat_interleave(counts)
-        return lambda b, h, qi, ki: (qi >= ki) | (ids[qi] == ids[ki] and flags[qi])
+        return lambda b, h, qi, ki: (qi >= ki) | ((ids[qi] * flags[qi]) == ids[ki])
 
     def get_attn_func(self) -> callable:
         """Return the attention function."""

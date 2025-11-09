@@ -45,7 +45,7 @@ class FlexAttentionCausal2D(nn.Module):
     def set_offsets_by_lens(self, lens, flags=None):
         """Set block-wise mask offsets by lengths."""
         self.set_offsets(list(accumulate(type(lens)([0]) + lens if lens[0] != 0 else lens)))
-        self.flags = flags  # Bidirectional flags (-1: lower triangular, 1: full).
+        self.flags = flags  # Bidirectional flags (-1: lower triangular, 1: full)
 
     def get_mask_mod(self) -> callable:
         """Return the mask modification."""

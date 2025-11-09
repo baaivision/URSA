@@ -27,11 +27,11 @@ from transformers.models.phi.configuration_phi import PhiConfig
 from diffnext.models.flash_attention import apply_rotary_emb
 
 
-def maybe_apply_ckpt(module, name, x) -> torch.Tensor:
+def maybe_apply_ckpt(function, x, enable=False) -> torch.Tensor:
     """Apply gradient checkpointing if possible."""
-    if module.gradient_checkpointing and x.requires_grad:
-        return torch.utils.checkpoint.checkpoint(getattr(module, name), x, use_reentrant=False)
-    return getattr(module, name)(x)
+    if enable and (x[0] if isinstance(x, (tuple, list)) else x).requires_grad:
+        return torch.utils.checkpoint.checkpoint(function, x, use_reentrant=False)
+    return function(x)
 
 
 class PhiRotaryEmbedding(nn.Module):
@@ -78,6 +78,7 @@ class PhiMLP(nn.Module):
 
     def __init__(self, config: PhiConfig):
         super().__init__()
+        self.gradient_checkpointing = False
         self.activation = ACT2FN[config.hidden_act]
         self.config, self.hidden_size = config, config.hidden_size
         self.fc1 = nn.Linear(config.hidden_size, config.intermediate_size)
@@ -103,6 +104,7 @@ class PhiAttention(nn.Module):
         self.attn_mask = self.past_key_value = self.pe_func = self.flex_attn = None
 
     def forward_qkv(self, x) -> torch.Tensor:
+        x = x[1](x[0]) if isinstance(x, (tuple, list)) else x  # PreNorm.
         q, k, v = [m(x) for m in (self.q_proj, self.k_proj, self.v_proj)]
         return [_.unflatten(-1, (-1, self.head_dim)) for _ in (q, k, v)]
 
@@ -114,7 +116,7 @@ class PhiSdpaAttention(PhiAttention):
     """Phi SDPA attention."""
 
     def forward(self, x) -> torch.Tensor:
-        q, k, v = maybe_apply_ckpt(self, "forward_qkv", x)
+        q, k, v = maybe_apply_ckpt(self.forward_qkv, x, self.gradient_checkpointing)
         q, k = [self.pe_func(_) for _ in (q, k)]
         q, k, v = [_.transpose(1, 2) for _ in (q, k, v)]
         if self.past_key_value is not None and getattr(self.past_key_value, "is_frozen", False):
@@ -143,7 +145,8 @@ class PhiDecoderLayer(nn.Module):
 
     def forward(self, x) -> torch.Tensor:
         shortcut, x = x, self.input_layernorm(x)
-        return self.self_attn(x).add_(maybe_apply_ckpt(self, "mlp", x)).add_(shortcut)
+        x = self.self_attn(x).add_(maybe_apply_ckpt(self.mlp, x, self.mlp.gradient_checkpointing))
+        return x.add_(shortcut)
 
 
 class PhiPreTrainedModel(PreTrainedModel):
@@ -181,8 +184,7 @@ class PhiModel(PhiPreTrainedModel):
         self.layers = [PhiDecoderLayer(config, i) for i in range(config.num_hidden_layers)]
         self.layers = nn.ModuleList(self.layers)
         self.final_layernorm = nn.LayerNorm(config.hidden_size, eps=config.layer_norm_eps)
-        self.rotary_emb = PhiRotaryEmbedding.from_config(config)
-        self.gradient_checkpointing, _ = False, self.post_init()
+        self.rotary_emb, _ = PhiRotaryEmbedding.from_config(config), self.post_init()
 
     def forward(
         self,
@@ -200,10 +202,7 @@ class PhiModel(PhiPreTrainedModel):
             layer.self_attn.pe_func = pe_func
             layer.self_attn.attn_mask = attention_mask
             layer.self_attn.past_key_value = past_key_values
-            if self.gradient_checkpointing and self.training:
-                x = self._gradient_checkpointing_func(layer.__call__, x)
-            else:
-                x = layer(x)
+            x = maybe_apply_ckpt(layer.__call__, x, layer.gradient_checkpointing)
         x = self.final_layernorm(x)
         return BaseModelOutputWithPast(last_hidden_state=x, past_key_values=past_key_values)
 

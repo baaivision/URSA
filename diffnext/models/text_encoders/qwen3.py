@@ -27,11 +27,11 @@ from diffnext.models.flash_attention import apply_rotary_emb, swiglu
 from diffnext.models.flash_attention import RMSNorm as Qwen3RMSNorm
 
 
-def maybe_apply_ckpt(module, name, x) -> torch.Tensor:
+def maybe_apply_ckpt(function, x, enable=False) -> torch.Tensor:
     """Apply gradient checkpointing if possible."""
-    if module.gradient_checkpointing and x.requires_grad:
-        return torch.utils.checkpoint.checkpoint(getattr(module, name), x, use_reentrant=False)
-    return getattr(module, name)(x)
+    if enable and (x[0] if isinstance(x, (tuple, list)) else x).requires_grad:
+        return torch.utils.checkpoint.checkpoint(function, x, use_reentrant=False)
+    return function(x)
 
 
 class Qwen3RotaryEmbedding(nn.Module):
@@ -77,6 +77,7 @@ class Qwen3MLP(nn.Module):
 
     def __init__(self, config):
         super().__init__()
+        self.gradient_checkpointing = False
         self.config, self.hidden_size = config, config.hidden_size
         self.gate_proj = nn.Linear(self.hidden_size, config.intermediate_size, bias=False)
         self.up_proj = nn.Linear(self.hidden_size, config.intermediate_size, bias=False)
@@ -104,6 +105,7 @@ class Qwen3Attention(nn.Module):
         self.attn_mask = self.past_key_value = self.pe_func = self.flex_attn = None
 
     def forward_qkv(self, x) -> torch.Tensor:
+        x = x[1](x[0]) if isinstance(x, (tuple, list)) else x  # PreNorm.
         q, k, v = [m(x) for m in (self.q_proj, self.k_proj, self.v_proj)]
         q, k, v = [_.unflatten(-1, (-1, self.head_dim)) for _ in (q, k, v)]
         return [m(_) for m, _ in zip((self.q_norm, self.k_norm), (q, k))] + [v]
@@ -116,7 +118,7 @@ class Qwen3SdpaAttention(Qwen3Attention):
     """Qwen3 SDPA attention."""
 
     def forward(self, x) -> torch.Tensor:
-        q, k, v = maybe_apply_ckpt(self, "forward_qkv", x)
+        q, k, v = maybe_apply_ckpt(self.forward_qkv, x, self.gradient_checkpointing)
         q, k = [self.pe_func(_) for _ in (q, k)]
         q, k, v = [_.transpose(1, 2) for _ in (q, k, v)]
         if self.past_key_value is not None and getattr(self.past_key_value, "is_frozen", False):
@@ -147,8 +149,8 @@ class Qwen3DecoderLayer(nn.Module):
         return self.mlp(self.post_attention_layernorm(x))
 
     def forward(self, x) -> torch.Tensor:
-        x = self.self_attn(self.input_layernorm(x)).add_(x)
-        return maybe_apply_ckpt(self, "forward_mlp", x).add_(x)
+        x = self.self_attn((x, self.input_layernorm)).add_(x)
+        return maybe_apply_ckpt(self.forward_mlp, x, self.mlp.gradient_checkpointing).add_(x)
 
 
 class Qwen3PreTrainedModel(PreTrainedModel):
@@ -187,8 +189,7 @@ class Qwen3Model(Qwen3PreTrainedModel):
         self.layers = [Qwen3DecoderLayer(config, i) for i in range(config.num_hidden_layers)]
         self.layers = nn.ModuleList(self.layers)
         self.norm = Qwen3RMSNorm(config.hidden_size, eps=config.rms_norm_eps)
-        self.rotary_emb = Qwen3RotaryEmbedding.from_config(config)
-        self.gradient_checkpointing, _ = False, self.post_init()
+        self.rotary_emb, _ = Qwen3RotaryEmbedding.from_config(config), self.post_init()
 
     def forward(
         self,
@@ -206,10 +207,7 @@ class Qwen3Model(Qwen3PreTrainedModel):
             layer.self_attn.pe_func = pe_func
             layer.self_attn.attn_mask = attention_mask
             layer.self_attn.past_key_value = past_key_values
-            if self.gradient_checkpointing and self.training:
-                x = self._gradient_checkpointing_func(layer.__call__, x)
-            else:
-                x = layer(x)
+            x = maybe_apply_ckpt(layer.__call__, x, layer.gradient_checkpointing)
         x = self.norm(x)
         return BaseModelOutputWithPast(last_hidden_state=x, past_key_values=past_key_values)
 

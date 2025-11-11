@@ -4,6 +4,7 @@
 
 <p align="center">
 <a href="https://arxiv.org/abs/2510.24717"><img src="https://img.shields.io/badge/ArXiv-2510.24717-%23840707.svg" alt="ArXiv"></a>
+<a href="https://huggingface.co/collections/BAAI/ursa"><img src="https://img.shields.io/badge/🤗 Weights-BAAI/URSA-rgb(166,109,59).svg" alt=""></a>
 <a href="https://huggingface.co/spaces/BAAI/nova-d48w1024-osp480"><img src="https://img.shields.io/badge/🤗 Demo-TI2V-%26840707.svg" alt="TI2VDemo"></a>
 <a href="http://bitterdhg.github.io/URSA_page"><img src="https://img.shields.io/badge/Project-URSA-%237CB4F7.svg" alt="Project"></a>
 </p>
@@ -38,15 +39,15 @@ We present **URSA** (**U**niform disc**R**ete diffu**S**ion with metric p**A**th
 
 | Model | Resolution | Data | Weight | GenEval | DPGBench |
 |:-----:|:----------:|:----:|:------:|:-------:|:--------:|
-| URSA-0.6B-IBQ1024 | 1024x1024 | 30M | [🤗 HF link](https://huggingface.co/BAAI/URSA-0.6B-IBQ1024) | 0.79 | 85.6 |
-| URSA-1.7B-IBQ1024 | 1024x1024 | 30M | [🤗 HF link](https://huggingface.co/BAAI/URSA-1.7B-IBQ1024) | 0.80 | 86.0 |
+| URSA-0.6B-IBQ1024 | 1024x1024 | 30M | [🤗 HF](https://huggingface.co/BAAI/URSA-0.6B-IBQ1024) \| [🤖 ModelScope](https://www.modelscope.cn/models/BAAI/URSA-0.6B-IBQ1024) | 0.79 | 85.6 |
+| URSA-1.7B-IBQ1024 | 1024x1024 | 30M | [🤗 HF](https://huggingface.co/BAAI/URSA-1.7B-IBQ1024) \| [🤖 ModelScope](https://www.modelscope.cn/models/BAAI/URSA-1.7B-IBQ1024) | 0.80 | 86.0 |
 
 ### 🎬 Text to Video
 
 | Model | Resolution | Data | Weight | VBench-T2V | VBench-I2V |
-|:-----:|:----------:|:----:|:-------|:----------:|:----------:|
-| URSA-0.6B-FSQ320 | 49x512x320 | 24M | [🤗 HF link](https://huggingface.co/BAAI/URSA-0.6B-FSQ320) | 81.4 | 86.0 |
-| URSA-1.7B-FSQ320 | 49x512x320 | 24M | [🤗 HF link](https://huggingface.co/BAAI/URSA-1.7B-FSQ320) | 82.4 | 86.2 |
+|:-----:|:----------:|:----:|:------:|:----------:|:----------:|
+| URSA-0.6B-FSQ320 | 49x512x320 | 24M | [🤗 HF](https://huggingface.co/BAAI/URSA-0.6B-FSQ320) \| [🤖 ModelScope](https://www.modelscope.cn/models/BAAI/URSA-0.6B-FSQ320) | 81.4 | 86.0 |
+| URSA-1.7B-FSQ320 | 49x512x320 | 24M | [🤗 HF](https://huggingface.co/BAAI/URSA-1.7B-FSQ320) \| [🤖 ModelScope](https://www.modelscope.cn/models/BAAI/URSA-1.7B-FSQ320) | 82.4 | 86.2 |
 
 ## 📖 Table of Contents
 - [🔧 Installation](#installation)

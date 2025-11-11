@@ -78,7 +78,7 @@ class MixtureDiscreteProbPath(DiscreteProbPath):
         x_0 = x_1.new_empty(x_1.shape).random_(to=self.emb.shape[0], generator=self.generator)
         return x_0.where(t.new_empty(x_1.shape).uniform_(generator=self.generator).lt(1 - t), x_1)
 
-    def get_velocity(self, logits, x_t, t: float) -> torch.Tensor:
+    def get_velocity(self, logits, x_t, t: float, x_1=None) -> torch.Tensor:
         """Return the velocity by converting the factorized posterior.
 
         Args:
@@ -88,11 +88,13 @@ class MixtureDiscreteProbPath(DiscreteProbPath):
                 The sample token index at time t, shape (bsz, ...).
             t (float)
                 The timestep ``t``.
+            x_1 (torch.Tensor, optional):
+                The sample token index at time t+1, shape (bsz, ...).
 
         Returns:
             torch.Tensor: The velocity ``v``.
         """
-        x_1 = self.categorical(logits.softmax(-1))
+        x_1 = self.categorical(logits.softmax(-1)) if x_1 is None else x_1
         return logits.zero_().scatter_(-1, x_1.unsqueeze(-1), 1 / (1 - t))
 
 
@@ -183,7 +185,7 @@ class MetricDiscreteProbPath(DiscreteProbPath):
         """
         return self.categorical(self.get_prob(self.emb[x_1], t))
 
-    def get_velocity(self, logits, x_t, t: float) -> torch.Tensor:
+    def get_velocity(self, logits, x_t, t: float, x_1=None) -> torch.Tensor:
         """Return the velocity by converting the factorized posterior.
 
         Args:
@@ -193,13 +195,15 @@ class MetricDiscreteProbPath(DiscreteProbPath):
                 The sample token index at time t, shape (bsz, ...).
             t (float)
                 The timestep ``t``.
+            x_1 (torch.Tensor, optional):
+                The sample token index at time t+1, shape (bsz, ...).
 
         Returns:
             torch.Tensor: The velocity ``v``, shape (bsz, ..., codebook_size).
         """
         numerator = self.c * self.alpha * (t ** (self.alpha - 1)) if t > 0 else 0
         d_beta_t = numerator / (1 - t) ** (self.alpha + 1)
-        emb_x_1 = self.emb[self.categorical(logits.softmax(-1))]
+        emb_x_1 = self.emb[self.categorical(logits.softmax(-1)) if x_1 is None else x_1]
         dist_x_1_x = self.get_dist(emb_x_1, logits)  # (bsz, ..., codebook_size)
         prob_x_1_x = self.get_prob_by_dist(dist_x_1_x, t)  # (bsz, ..., codebook_size)
         dist_x_t_x_1 = self.get_dist(self.emb[x_t], emb_x_1)  # (bsz, ..., 1)
@@ -286,7 +290,7 @@ class KineticOptimalScheduler(SchedulerMixin, ConfigMixin):
         Returns:
             torch.Tensor: The sample token index at time t, shape (bsz, ...).
         """
-        self.path.generator = generator
+        self.path.generator = generator if generator else self.path.generator
         return self.path.sample(original_samples, timesteps)
 
     def timestep_to_t(self, timestep) -> float:
@@ -302,11 +306,27 @@ class KineticOptimalScheduler(SchedulerMixin, ConfigMixin):
         sigma = 1 - self.timesteps[timestep] / self.num_inference_steps
         return 1 - self.shift * sigma / (1 + (self.shift - 1) * sigma)
 
+    def sample(self, model_output, generator=None) -> torch.Tensor:
+        """Sample token index from the model logits.
+
+        Args:
+            model_output (torch.Tensor)
+                The sample token logits, shape (bsz, ..., codebook_size).
+            generator (torch.Generator, optional):
+                The random generator.
+
+        Returns:
+            torch.Tensor: The sample token index, shape (bsz, ...).
+        """
+        self.path.generator = generator if generator else self.path.generator
+        return self.path.categorical(model_output.softmax(-1))
+
     def step(
         self,
         model_output,
         timestep,
         sample,
+        prev_sample=None,
         generator=None,
         return_dict=True,
     ) -> KineticOptimalSchedulerOutput:
@@ -319,6 +339,8 @@ class KineticOptimalScheduler(SchedulerMixin, ConfigMixin):
                 The discrete timestep index.
             sample (torch.Tensor)
                 The sample token index at time t, shape (bsz, ...).
+            prev_sample (torch.Tensor, optional)
+                The sample token index at time t+1, shape (bsz, ...).
             generator (torch.Generator, optional):
                 The random generator.
             return_dict (bool, optional)
@@ -327,13 +349,13 @@ class KineticOptimalScheduler(SchedulerMixin, ConfigMixin):
         Returns:
             torch.Tensor: The sample token index at time t+1, shape (bsz, ...).
         """
-        self.path.generator = generator
+        self.path.generator = generator if generator else self.path.generator
         if timestep == self.num_inference_steps - 1:
-            prev_sample = self.path.categorical(model_output.softmax(-1))
+            prev_sample = self.sample(model_output) if prev_sample is None else prev_sample
         else:
             t = self.timestep_to_t(timestep)
             dt = self.timestep_to_t(timestep + 1) - t
-            v = self.path.get_velocity(model_output, sample, t)
+            v = self.path.get_velocity(model_output, sample, t, prev_sample)
             u_dist = torch.empty_like(sample, dtype=v.dtype).uniform_(generator=generator)
             jump_thresh = 1 - v.scatter_(-1, sample[..., None], 0).sum(-1).mul_(-dt).exp_()
             prev_sample, jump_index = sample.clone(), u_dist < jump_thresh

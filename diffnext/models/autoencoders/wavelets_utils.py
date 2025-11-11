@@ -37,7 +37,7 @@ class Patcher2D(nn.Module):
         self.register_buffer("wavelets1", wavelets1, persistent=False)
         self.register_buffer("wavelets2", wavelets2, persistent=False)
 
-    def dwt(self, x):
+    def dwt(self, x) -> torch.Tensor:
         g = x.size(1)
         hl = self.wavelets1.flip(0).view(1, 1, -1).repeat(g, 1, 1)
         hh = self.wavelets2.view(1, 1, -1).repeat(g, 1, 1)
@@ -48,7 +48,7 @@ class Patcher2D(nn.Module):
                 out.append(nn.functional.conv2d(x2, w2[:, :, :, None], stride=(2, 1), groups=g))
         return torch.cat(out, dim=1).mul_(1 / self.rescale_factor)
 
-    def idwt(self, x):
+    def idwt(self, x) -> torch.Tensor:
         g = x.size(1) // 4
         hl = self.wavelets1.flip([0]).view(1, 1, -1).repeat([g, 1, 1])
         hh = self.wavelets2.view(1, 1, -1).repeat(g, 1, 1)
@@ -63,7 +63,7 @@ class Patcher2D(nn.Module):
             out.append(nn.functional.conv_transpose2d(x, w, stride=(1, 2), groups=g))
         return out[2].add(out[3]).mul_(self.rescale_factor)
 
-    def forward(self, x):
+    def forward(self, x) -> torch.Tensor:
         for _ in range(self.num_strides):
             x = self.dwt(x)
         return x
@@ -76,7 +76,7 @@ class Patcher3D(Patcher2D):
         super(Patcher3D, self).__init__(patch_size)
         self.rescale_factor = 2 * 2**0.5
 
-    def dwt(self, x):
+    def dwt(self, x) -> torch.Tensor:
         g = x.size(1)
         hl = self.wavelets1.flip(0).view(1, 1, -1).repeat(g, 1, 1)
         hh = self.wavelets2.view(1, 1, -1).repeat(g, 1, 1)
@@ -90,7 +90,7 @@ class Patcher3D(Patcher2D):
                     out.append(nn.functional.conv3d(x3, w3, stride=(1, 1, 2), groups=g))
         return torch.cat(out, dim=1).mul_(1.0 / self.rescale_factor)
 
-    def idwt(self, x):
+    def idwt(self, x) -> torch.Tensor:
         g = x.size(1) // 8
         hl = self.wavelets1.flip([0]).view(1, 1, -1).repeat([g, 1, 1])
         hh = self.wavelets2.view(1, 1, -1).repeat(g, 1, 1)
@@ -110,7 +110,7 @@ class Patcher3D(Patcher2D):
             out.append(nn.functional.conv_transpose3d(x, w, stride=(2, 1, 1), groups=g))
         return out[2].add(out[3]).mul_(self.rescale_factor)
 
-    def forward(self, x):
+    def forward(self, x) -> torch.Tensor:
         x = torch.cat([x[:, :, :1].repeat_interleave(self.patch_size, 2), x[:, :, 1:]], 2)
         for _ in range(self.num_strides):
             x = self.dwt(x)

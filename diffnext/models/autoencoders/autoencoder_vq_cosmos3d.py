@@ -33,7 +33,7 @@ from diffnext.models.autoencoders.wavelets_utils import Patcher3D
 class GroupNorm2D(nn.GroupNorm):
     """2D group normalization."""
 
-    def forward(self, x):
+    def forward(self, x) -> torch.Tensor:
         x, bsz = super().forward(x.transpose(1, 2).flatten(0, 1)), x.size(0)
         return rearrange(x, "(b t) c h w -> b c t h w", b=bsz)
 
@@ -54,7 +54,7 @@ class Conv3d(nn.Conv3d):
     def new_factorized(cls, dim, out_dim):
         return nn.Sequential(cls(dim, out_dim, (1, 3, 3), 1, 1), cls(out_dim, out_dim, (3, 1, 1)))
 
-    def forward(self, x):
+    def forward(self, x) -> torch.Tensor:
         return super(Conv3d, self).forward(self.pad(x))
 
 
@@ -68,10 +68,10 @@ class Attention(nn.Module):
         self.to_out = nn.ModuleList([nn.Linear(dim, dim)])
 
     @classmethod
-    def new_factorized(cls, dim):
+    def new_factorized(cls, dim) -> nn.Sequential:
         return nn.Sequential(cls(dim, "(b t) 1 (h w) c"), cls(dim, "(b h w) 1 t c"))
 
-    def forward(self, x):
+    def forward(self, x) -> torch.Tensor:
         shortcut, x, (bsz, _, _, h, w) = x, self.group_norm(x), x.size()
         x = rearrange(x, "b c t h w -> %s" % self.perm)
         q, k, v = [f(x) for f in (self.to_q, self.to_k, self.to_v)]
@@ -94,7 +94,7 @@ class Resize(nn.Module):
             self.conv2 = Conv3d(dim, dim, (1, 3, 3), 1, 1)
         self.conv3 = Conv3d(dim, dim, 1) if spatial or temporal else nn.Identity()
 
-    def forward(self, x):
+    def forward(self, x) -> torch.Tensor:
         if self.spatial == 1:
             _ = nn.functional.avg_pool3d(x, (1, 2, 2), (1, 2, 2))
             x = self.conv1(nn.functional.pad(x, (0, 1, 0, 1, 0, 0))).add_(_)
@@ -122,7 +122,7 @@ class ResBlock(nn.Module):
         self.conv_shortcut = Conv3d(dim, out_dim, 1) if out_dim != dim else None
         self.nonlinearity, self.dropout = nn.SiLU(), nn.Dropout(0)
 
-    def forward(self, x):
+    def forward(self, x) -> torch.Tensor:
         shortcut = self.conv_shortcut(x) if self.conv_shortcut else x
         x = self.conv1(self.nonlinearity(self.norm1(x)))
         return self.conv2(self.nonlinearity(self.norm2(x))).add_(shortcut)
@@ -138,7 +138,7 @@ class UNetResBlock(nn.Module):
         self.downsamplers = nn.ModuleList([Resize(out_dim, *downsample)]) if downsample else []
         self.upsamplers = nn.ModuleList([Resize(out_dim, *upsample)]) if upsample else []
 
-    def forward(self, x):
+    def forward(self, x) -> torch.Tensor:
         for resnet in self.resnets:
             x = resnet(x)
         x = self.downsamplers[0](x) if self.downsamplers else x
@@ -153,7 +153,7 @@ class UNetMidBlock(nn.Module):
         self.resnets = nn.ModuleList(ResBlock(dim, dim) for _ in range(depth + 1))
         self.attentions = nn.ModuleList(Attention.new_factorized(dim) for _ in range(depth))
 
-    def forward(self, x):
+    def forward(self, x) -> torch.Tensor:
         x = self.resnets[0](x)
         for attn, resnet in zip(self.attentions, self.resnets[1:]):
             x = resnet(attn(x))
@@ -189,7 +189,7 @@ class Encoder(nn.Module):
         self.conv_norm_out, self.conv_act = GroupNorm2D(1, block_dim, eps=1e-6), nn.SiLU()
         self.conv_out = Conv3d.new_factorized(block_dim, out_dim)
 
-    def forward(self, x):
+    def forward(self, x) -> torch.Tensor:
         x = torch.cat([x[:, :, :1].repeat_interleave(self.patcher.patch_size, 2), x[:, :, 1:]], 2)
         for _ in range(self.patcher.num_strides):
             x = self.patcher.dwt(x)
@@ -232,7 +232,7 @@ class Decoder(nn.Module):
         self.conv_norm_out, self.conv_act = GroupNorm2D(1, block_dim, eps=1e-6), nn.SiLU()
         self.conv_out = Conv3d.new_factorized(block_dim, out_dim * patch_size**3)
 
-    def forward(self, x):
+    def forward(self, x) -> torch.Tensor:
         x = self.conv_in(x)
         x = self.mid_block(x)
         for blk in self.up_blocks:

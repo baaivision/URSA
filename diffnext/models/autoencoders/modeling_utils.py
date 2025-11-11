@@ -46,7 +46,7 @@ class DiagonalGaussianDistribution(object):
         self.logvar = self.logvar.clamp(-30.0, 20.0)
         self.std, self.var = self.logvar.mul(0.5).exp_(), self.logvar.exp()
 
-    def sample(self, generator=None):
+    def sample(self, generator=None) -> torch.Tensor:
         device, dtype = self.mean.device, self.mean.dtype
         norm_dist = torch.randn(self.mean.shape, generator=generator, device=device, dtype=dtype)
         return norm_dist.mul_(self.std).add_(self.mean).to(device=self.device, dtype=self.dtype)
@@ -66,7 +66,7 @@ class TilingMixin(object):
         self.sample_min_t, self.latent_min_t = sample_min_t, latent_min_t
         self.sample_ovr_t, self.latent_ovr_t = sample_ovr_t, latent_ovr_t
 
-    def tiled_encoder(self, x):
+    def tiled_encoder(self, x) -> torch.Tensor:
         if x.dim() == 4 or x.size(2) <= self.sample_min_t:
             return self.encoder(x)
         t = x.shape[2]
@@ -76,7 +76,7 @@ class TilingMixin(object):
         t_tiles = [x[:, :, self.latent_ovr_t :] if i else x for i, x in enumerate(t_tiles)]
         return torch.cat(t_tiles, dim=2)
 
-    def tiled_decoder(self, x, **kwargs):
+    def tiled_decoder(self, x, **kwargs) -> torch.Tensor:
         if x.dim() == 4 or x.size(2) <= self.latent_min_t:
             return self.decoder(x, **kwargs)
         t = x.shape[2]
@@ -90,5 +90,5 @@ class TilingMixin(object):
 class HybridMixin(object):
     """Base class for hybrid module."""
 
-    def forward(self, x):
+    def forward(self, x) -> torch.Tensor:
         return self.forward_image(x) if x.dim() == 4 else self.forward_video(x)

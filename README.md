@@ -1,5 +1,7 @@
 <div align="center">
 
+<img src="assets/logo.png" width="30%" alt="logo"/>
+
 <h1>🐻 URSA: Uniform Discrete Diffusion with Metric Path<br>for Video Generation</h1>
 
 <p align="center">

@@ -53,8 +53,8 @@ def build_wandb(config, accelerator):
     old_run_id = config.wandb.get("run_id", None)
     config.wandb.run_id = run_id = old_run_id or wandb.util.generate_id()
     init_kwargs = dict(id=run_id, name=config.experiment.name, resume=old_run_id is not None)
-    init_kwargs["config"] = wandb_config = {k: v for k, v in flatten_omega_conf(config, True)}
-    accelerator.init_trackers(config.experiment.project, wandb_config, {"wandb": init_kwargs})
+    init_kwargs["config"] = {k: v for k, v in flatten_omega_conf(config, True)}
+    accelerator.init_trackers(config.experiment.project, init_kwargs={"wandb": init_kwargs})
 
 
 def get_ddp_shards(accelerator) -> dict:

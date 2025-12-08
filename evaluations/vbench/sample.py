@@ -86,7 +86,7 @@ if __name__ == "__main__":
 
     for step in tqdm(range(0, len(dense_prompts), args.prompt_size), disable=rank):
         samples, paths, gen_args["generator"] = [], [], generator
-        prompts = dense_prompts[step : step + args.prompt_size]
+        prompts = caps[step : step + args.prompt_size]
         prompts = [f"motion={args.motion_score:.1f}, {text_prompt}" for text_prompt in prompts]
         paths = names[step : step + args.prompt_size] * args.sample_size
         [samples.extend(pipe(prompts, **gen_args).frames) for _ in range(args.sample_size)]

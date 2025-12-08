@@ -45,6 +45,7 @@ class URSATransformer3DModel(ModelMixin, ConfigMixin):
         lm_vocab_size=151669,
         lm_head_size=64000,
         bov_token_id=151652,
+        attn_implementation=None,
         **kwargs,
     ):
         super().__init__()
@@ -68,7 +69,7 @@ class URSATransformer3DModel(ModelMixin, ConfigMixin):
     ) -> Transformer2DModelOutput:
         if self.training and isinstance(input_ids, dict):  # Prepare training args.
             inputs, _ = input_ids, self.pipeline_preprocess(input_ids)
-            input_ids, labels, kwargs = inputs.pop("input_ids"), inputs.pop("labels"), inputs
+            input_ids, labels, kwargs = inputs.pop("input_ids"), inputs["labels"], inputs
 
         outputs = self.model(input_ids, inputs_embeds=inputs_embeds, **kwargs)
         keep = slice(-logits_to_keep, None) if isinstance(logits_to_keep, int) else logits_to_keep
@@ -80,11 +81,13 @@ class URSATransformer3DModel(ModelMixin, ConfigMixin):
                 return cross_entropy_loss(logits.flatten(0, 1), labels, inplace_backward=True)[0]
             return nn.functional.cross_entropy(logits.flatten(0, 1), labels, reduction="none")
 
-        if labels is not None:
+        if labels is not None and isinstance(labels, torch.Tensor):  # NTP loss.
             lbls = torch.nn.functional.pad(labels[:, 1:], (0, 1), value=-100)
             loss = flash_loss(logits.float(), lbls.flatten()).view(lbls.shape)
             acc1, mask = logits.data.argmax(-1).eq(lbls), lbls.ne(-100)
             loss, acc1 = loss.sum().div(mask.sum()), acc1[mask].float().mean()
             return self.pipeline_postprocess(loss, acc1)
+        elif labels is not None and isinstance(labels, dict):  # Custom losses.
+            return self.pipeline_postprocess(inputs, logits)
 
         return Transformer2DModelOutput(sample=logits)

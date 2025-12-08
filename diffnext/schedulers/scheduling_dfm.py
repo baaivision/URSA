@@ -306,27 +306,11 @@ class KineticOptimalScheduler(SchedulerMixin, ConfigMixin):
         sigma = 1 - self.timesteps[timestep] / self.num_inference_steps
         return 1 - self.shift * sigma / (1 + (self.shift - 1) * sigma)
 
-    def sample(self, model_output, generator=None) -> torch.Tensor:
-        """Sample token index from the model logits.
-
-        Args:
-            model_output (torch.Tensor)
-                The sample token logits, shape (bsz, ..., codebook_size).
-            generator (torch.Generator, optional):
-                The random generator.
-
-        Returns:
-            torch.Tensor: The sample token index, shape (bsz, ...).
-        """
-        self.path.generator = generator if generator else self.path.generator
-        return self.path.categorical(model_output.softmax(-1))
-
     def step(
         self,
         model_output,
         timestep,
         sample,
-        prev_sample=None,
         generator=None,
         return_dict=True,
     ) -> KineticOptimalSchedulerOutput:
@@ -339,8 +323,6 @@ class KineticOptimalScheduler(SchedulerMixin, ConfigMixin):
                 The discrete timestep index.
             sample (torch.Tensor)
                 The sample token index at time t, shape (bsz, ...).
-            prev_sample (torch.Tensor, optional)
-                The sample token index at time t+1, shape (bsz, ...).
             generator (torch.Generator, optional):
                 The random generator.
             return_dict (bool, optional)
@@ -351,11 +333,11 @@ class KineticOptimalScheduler(SchedulerMixin, ConfigMixin):
         """
         self.path.generator = generator if generator else self.path.generator
         if timestep == self.num_inference_steps - 1:
-            prev_sample = self.sample(model_output) if prev_sample is None else prev_sample
+            prev_sample = self.path.categorical(model_output.softmax(-1))
         else:
             t = self.timestep_to_t(timestep)
             dt = self.timestep_to_t(timestep + 1) - t
-            v = self.path.get_velocity(model_output, sample, t, prev_sample)
+            v = self.path.get_velocity(model_output, sample, t)
             u_dist = torch.empty_like(sample, dtype=v.dtype).uniform_(generator=generator)
             jump_thresh = 1 - v.scatter_(-1, sample[..., None], 0).sum(-1).mul_(-dt).exp_()
             prev_sample, jump_index = sample.clone(), u_dist < jump_thresh

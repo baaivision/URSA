@@ -192,11 +192,12 @@ class URSAPipeline(DiffusionPipeline, PipelineMixin):
             input_ids[:, -num_latent_tokens:] = latents + latent_shift
 
         # 7. Postprocessing
-        video = latents = latents.view(-1, *latents_shape)
+        video = latents.view(-1, *latents_shape)
         output_type = "np" if output_type == "pil" and video.size(1) > 1 else output_type
         if output_type != "latent":
-            video = self.image_processor.decode_latents(self.vae, latents, vae_batch_size)
+            video = self.image_processor.decode_latents(self.vae, video, vae_batch_size)
         video = self.image_processor.postprocess(video, output_type)
+        video = (video, latents.states) if hasattr(latents, "states") else video
         return URSAPipelineOutput(frames=video)
 
     def prepare_latents(
@@ -285,14 +286,14 @@ class URSAPipeline(DiffusionPipeline, PipelineMixin):
             return [a or b] * n if isinstance(a or b, str) else (a or b)
 
         prompt = [prompt] if isinstance(prompt, str) else prompt
-        negative_prompt = select_or_pad(negative_prompt, "", len(prompt))
         args = {"max_length": max_prompt_length, "return_tensors": "pt", **self.tokenizer_args}
         if prompt_ids is None:
             prompt_ids = self.tokenizer(prompt, **args).input_ids.to(self._device)
-            prompt_ids = prompt_ids.repeat_interleave(num_images_per_prompt, 0)
         if negative_prompt_ids is None:
+            negative_prompt = select_or_pad(negative_prompt, "", len(prompt_ids))
             negative_prompt_ids = self.tokenizer(negative_prompt, **args).input_ids.to(self._device)
-            negative_prompt_ids = negative_prompt_ids.repeat_interleave(num_images_per_prompt, 0)
+        prompt_ids = prompt_ids.repeat_interleave(num_images_per_prompt, 0)
+        negative_prompt_ids = negative_prompt_ids.repeat_interleave(num_images_per_prompt, 0)
         return prompt_ids, negative_prompt_ids
 
     def encode_image(self, image, num_images_per_prompt=1, generator=None) -> torch.Tensor:

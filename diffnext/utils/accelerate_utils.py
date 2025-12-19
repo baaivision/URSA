@@ -80,7 +80,7 @@ def set_logger(output_dir=None, name="diffnext", level="INFO", accelerator=None)
         return f
 
     logger = logging.getLogger(name)
-    logger.setLevel(level)
+    logger.propagate, _ = False, logger.setLevel(level)
     fmt = "%(asctime)s %(levelname)s %(filename)s:%(lineno)d] %(message)s"
     formatter = logging.Formatter(fmt, datefmt="%m/%d %H:%M:%S")
     ch = logging.StreamHandler(sys.stdout)

@@ -50,10 +50,10 @@ class URSATransformer3DModel(ModelMixin, ConfigMixin):
     ):
         super().__init__()
         self.model = Qwen3Model(Qwen3Config.from_dict(self._internal_dict))
-        self.model.flex_attn = FlexAttentionCausal2D()
-        self.model.flex_rope = FlexRotaryEmbedding.from_config(self.model.config)
+        self.model.flex_attn = self.flex_attn = FlexAttentionCausal2D()
+        self.model.flex_rope = self.flex_rope = FlexRotaryEmbedding.from_config(self.model.config)
         [setattr(layer.self_attn, "is_causal", False) for layer in self.model.layers]
-        [setattr(layer.self_attn, "flex_attn", self.model.flex_attn) for layer in self.model.layers]
+        [setattr(layer.self_attn, "flex_attn", self.flex_attn) for layer in self.model.layers]
         self.lm_head = nn.Linear(hidden_size, lm_head_size, bias=False)
         self.pipeline_preprocess = lambda inputs: inputs  # Preprocess hook.
         self.pipeline_postprocess = lambda *args, **kwargs: {}  # Postprocess hook.

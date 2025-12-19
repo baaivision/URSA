@@ -44,12 +44,16 @@ class Trainer(object):
         self.pipe = self.pipe.to(device=engine_utils.get_device(config.training.gpu_id))
         self.ema = ModelEMA(self.pipe.model, **config.ema.params) if "ema" in config else None
         self.model = self.pipe.configure_model(config, accelerator, logger)
-        param_groups = self.model.parameters()
-        if getattr(config.optimizer, "param_groups", True):
+        param_groups = [_ for _ in self.model.parameters() if _.requires_grad]
+        if config.optimizer.get("param_groups", True):
             param_groups = engine_utils.get_param_groups(self.model)
         self.optimizer = config_to_object(config.optimizer, params=param_groups)
         self.scheduler = config_to_object(config.lr_scheduler)
         self.model, self.optimizer = self.accelerator.prepare(self.model, self.optimizer)
+        if config.training.get("sequence_parallel_size", 1) > 1:
+            if not hasattr(self.pipe.model, "configure_sequence_parallel"):
+                raise RuntimeError("Model does not support sequence parallelism.")
+            self.pipe.model.configure_sequence_parallel(self.model.seq_parallel_group)
         self.metrics = collections.OrderedDict()
         if self.ema and config.experiment.resume_iter > 0:
             ckpt = config.experiment.resume_from_checkpoint
@@ -108,17 +112,20 @@ class Trainer(object):
         self.accelerator.log(tracker_logs, step=stats["step"])
         self.metrics.clear()
 
-    def run_model(self, metrics, accum_steps=1):
+    def run_model(self, inputs, metrics, accum_steps=1):
         """Run multiple model steps.
 
         Args:
+            inputs (Dict)
+                The model inputs.
             metrics (Dict)
                 The current iteration metrics.
-            accum_step (int)
+            accum_step (int, optional, defaults to 1)
                 The gradient accumulation steps.
+
         """
         for _ in range(accum_steps):
-            inputs = self.train_dataloader.next()[0]
+            inputs = inputs if inputs else self.train_dataloader.next()[0]
             outputs, losses = self.model(inputs), []
             for k, v in outputs.items():
                 if "loss" not in k and "metric" not in k:
@@ -133,11 +140,13 @@ class Trainer(object):
             self.accelerator.accumulate().__enter__()
             self.accelerator.backward(losses)
 
-    def run_step(self, accum_steps=1) -> dict:
+    def run_step(self, inputs, accum_steps=1) -> dict:
         """Run single iteration step.
 
         Args:
-            accum_step (int)
+            inputs (Dict)
+                The model inputs.
+            accum_step (int, optional, defaults to 1)
                 The gradient accumulation steps.
 
         Returns:
@@ -149,7 +158,7 @@ class Trainer(object):
         stats["lr"] = self.scheduler.get_lr()
         for group in self.optimizer.param_groups:
             group["lr"] = stats["lr"] * group.get("lr_scale", 1.0)
-        self.run_model(metrics, accum_steps)
+        self.run_model(inputs, metrics, accum_steps)
         self.optimizer.step()
         self.optimizer.zero_grad(set_to_none=True)
         self.scheduler.step()
@@ -164,10 +173,13 @@ class Trainer(object):
         accum_steps = self.config.training.gradient_accumulation_steps
         log_every = self.config.experiment.log_every
         save_every = self.config.experiment.save_every
+        data_every, inputs = self.config.training.get("data_every", -1), {}
         self.scheduler._step_count = self.config.experiment.get("resume_iter", 0)
         while self.global_step < max_steps:
+            if data_every >= 1 and self.global_step % data_every == 0:
+                inputs = self.train_dataloader.next()[0]
             with timer.tic_and_toc():
-                stats = self.run_step(accum_steps)
+                stats = self.run_step(inputs, accum_steps)
             self.add_metrics(stats)
             if stats["step"] % log_every == 0:
                 self.log_metrics(stats)
@@ -177,6 +189,7 @@ class Trainer(object):
                 self.ema.update(self.model)
             if self.global_step % save_every == 0:
                 self.save()
+        stats["step"] = self.global_step
         self.log_metrics({**stats, **{"step": self.global_step}})
         self.accelerator.wait_for_everyone()
         self.accelerator.end_training()

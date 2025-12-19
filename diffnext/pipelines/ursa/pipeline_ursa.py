@@ -182,9 +182,9 @@ class URSAPipeline(DiffusionPipeline, PipelineMixin):
             t = self.scheduler.timestep_to_t(timestep)
             uncond_ids[:, -num_latent_tokens:] = input_ids[:, -num_latent_tokens:]
             if guidance_scale > 1:
-                model_input = torch.cat([input_ids, uncond_ids])
-                cond, uncond = self.transformer(model_input, **model_args)[0].chunk(2)
-                z = uncond.add_(cond.sub_(uncond).mul_(guidance_scale if t < guidance_trunc else 1))
+                z = self.transformer(torch.cat([input_ids, uncond_ids]), **model_args)[0]
+                cond, uncond = z[:, -(num_latent_tokens + 1) : -1].chunk(2)
+                z = uncond.add_(cond.sub(uncond).mul_(guidance_scale if t < guidance_trunc else 1))
             else:
                 z = self.transformer(input_ids, **model_args)[0]
             z = z[:, -(num_latent_tokens + 1) : -1]

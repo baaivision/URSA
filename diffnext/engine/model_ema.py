@@ -27,9 +27,12 @@ class ModelEMA(torch.nn.Module):
         self.decay = decay
         self.update_every = update_every
         self.model = copy.deepcopy(model).eval()
-        self.model._apply(lambda t: t.float() if t.requires_grad else t)  # FP32.
+        self.model._apply(lambda t: t.float() if t.requires_grad else t) if decay < 1 else None
         [setattr(p, "requires_grad", False) for p in self.model.parameters()]
         self.model.cpu() if device == "cpu" else None
+
+    def forward(self, *args, **kwargs):
+        return self.model(*args, **kwargs)
 
     @torch.no_grad()
     def update(self, model):

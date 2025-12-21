@@ -187,7 +187,7 @@ class URSAPipeline(DiffusionPipeline, PipelineMixin):
                 z = uncond.add_(cond.sub(uncond).mul_(guidance_scale if t < guidance_trunc else 1))
             else:
                 z = self.transformer(input_ids, **model_args)[0]
-            z = z[:, -(num_latent_tokens + 1) : -1]
+                z = cond = z[:, -(num_latent_tokens + 1) : -1]
             latents = self.scheduler.step(z, timestep, latents, generator=generator)[0]
             input_ids[:, -num_latent_tokens:] = latents + latent_shift
 

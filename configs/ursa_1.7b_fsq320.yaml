@@ -1,0 +1,62 @@
+wandb:
+  run_id: null
+
+experiment:
+  project: ursa_1.7b_fsq320
+  log_every: 20
+  save_every: 5000
+  resume_from_checkpoint: latest
+
+model:
+  name: "transformer"
+  gradient_checkpointing: 2  # 1: +mlp_ckpt 2: +qkv_ckpt 3: +layer_ckpt
+  async_timestep: true
+  tokenizer:
+    params:
+      max_length: 320
+      truncation: true
+      padding_side: left
+      padding: max_length
+
+pipeline:
+  target: diffnext.pipelines.ursa.pipeline_train.URSATrainPipeline
+  paths:
+      pretrained_path: /path/to/URSA-1.7B-FSQ320
+      module_dict:
+        vae: ${pipeline.paths.pretrained_path}/vae
+        scheduler: ${pipeline.paths.pretrained_path}/scheduler
+        tokenizer: ${pipeline.paths.pretrained_path}/tokenizer
+        model_index: ${pipeline.paths.pretrained_path}/model_index.json
+
+optimizer:
+  target: torch.optim.AdamW
+  param_groups: false
+  params:
+    lr: 0.00003
+    betas: [0.9, 0.95]
+    weight_decay: 0.05
+    fused: true
+
+lr_scheduler:
+  target: diffnext.engine.lr_scheduler.CosineLR
+  params:
+    lr_max: ${optimizer.params.lr}
+    lr_min: 0.00001
+    max_steps: ${training.max_train_steps}
+    warmup_steps: 500
+
+train_dataloader:
+  target: diffnext.data.flex_loaders.FeatureDataLoader
+  params:
+    dataset: /path/to/fsq320_dataset
+    batch_size: ${training.batch_size}
+    seed: ${training.seed}
+    num_workers: 4
+    shuffle: true
+
+training:
+  gradient_accumulation_steps: 1
+  batch_size: 1  # * 256 = 256
+  max_train_steps: 20000
+  seed: 1337
+  mixed_precision: bf16

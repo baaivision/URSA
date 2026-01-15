@@ -82,6 +82,9 @@ def run_train(config, accelerator, logger):
             The logger instance.
     """
     trainer = Trainer(config, accelerator, logger)
+    if accelerator.is_main_process:  # Configs have already been determined.
+        config_path = os.path.join(config.experiment.output_dir, "config.yaml")
+        omegaconf_utils.save_config(config, config_path)
     logger.info("#Params: %.2fM" % engine_utils.count_params(trainer.model))
     logger.info("Start training...")
     trainer.train_loop()
@@ -100,9 +103,6 @@ def main():
     engine_utils.manual_seed(config.training.seed, (config.training.gpu_id, device_seed))
     prepare_checkpoints(config), prepare_datasets(config, accelerator)
     logger.info(f"Config:\n{omegaconf_utils.config_to_yaml(config)}")
-    if accelerator.is_main_process:
-        config_path = os.path.join(config.experiment.output_dir, "config.yaml")
-        omegaconf_utils.save_config(config, config_path)
     run_train(config, accelerator, logger)
 
 

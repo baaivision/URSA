@@ -25,6 +25,7 @@
 We present **URSA** (**U**niform disc**R**ete diffu**S**ion with metric p**A**th), a simple yet powerful framework that bridges the gap with continuous approaches. **URSA** formulates the video generation task as an iterative global refinement of discrete spatiotemporal tokens and scales efficiently to long video generation, requiring fewer inference steps. **URSA** enables multi-task video generation with asynchronous timestep scheduling strategy in one unified model.
 
 ## 🚀 News
+- ```[Feb 2026]``` Accepted by ICLR 2026 [[OpenReview]](https://openreview.net/forum?id=GFU5yCbILk).
 - ```[Jan 2026]``` Released [Training Guide](./docs/training.md).
 - ```[Oct 2025]``` 🎉 URSA is part of [Emu3.5](https://github.com/baaivision/Emu3.5) as DiDA (Discrete Diffusion Adaptation)!
 - ```[Oct 2025]``` Released <a href="https://huggingface.co/spaces/BAAI/nova-d48w1024-osp480"><b>TI2V</b></a> 🤗 Demo.

@@ -25,6 +25,7 @@
 We present **URSA** (**U**niform disc**R**ete diffu**S**ion with metric p**A**th), a simple yet powerful framework that bridges the gap with continuous approaches. **URSA** formulates the video generation task as an iterative global refinement of discrete spatiotemporal tokens and scales efficiently to long video generation, requiring fewer inference steps. **URSA** enables multi-task video generation with asynchronous timestep scheduling strategy in one unified model.
 
 ## 🚀 News
+- ```[Apr 2026]``` 🎉 [UDM-GRPO](https://github.com/Yovecent/UDM-GRPO), the first GRPO framework for Uniform Diffusion Models.
 - ```[Feb 2026]``` Accepted by ICLR 2026 [[OpenReview]](https://openreview.net/forum?id=GFU5yCbILk).
 - ```[Jan 2026]``` Released [Training Guide](./docs/training.md).
 - ```[Oct 2025]``` 🎉 URSA is part of [Emu3.5](https://github.com/baaivision/Emu3.5) as DiDA (Discrete Diffusion Adaptation)!
@@ -158,10 +159,19 @@ python scripts/app_ursa_ti2v.py --model "BAAI/URSA-1.7B-FSQ320" --device 0
 - [X] [Gradio Demo](#gradio-demo)
 - [X] [Evaluation Guide](./docs/evaluation.md)
 - [X] [Training Guide](./docs/training.md)
+- [X] [Reinforcement Learning Framework](https://github.com/Yovecent/UDM-GRPO)
 - [ ] 4B Model
 
 ## 📖 Citation
 If you find this repository useful, please consider giving a star ⭐ and citation 🦖:
+```
+@article{wang2026udmgrpo,
+  title={UDM-GRPO: Stable and Efficient Group Relative Policy Optimization for Uniform Discrete Diffusion Models},
+  author={Wang, Jiaqi and Deng, Haoge and Pan, Ting and Liu, Yang and Wang, Chengyuan and Zhang, Fan and Qi, Yonggang and Wang, Xinlong},
+  journal={arXiv preprint arXiv:2604.18518},
+  year={2026}
+}
+```
 ```
 @article{deng2025ursa,
   title={Uniform Discrete Diffusion with Metric Path for Video Generation},

@@ -14,6 +14,7 @@
 # ------------------------------------------------------------------------
 """Discrete quantizers."""
 
+import math
 import torch
 from torch import nn
 
@@ -28,13 +29,12 @@ class VQuantizer(nn.Identity):
 
     def quantize(self, z: torch.Tensor) -> torch.Tensor:
         """Quantize z to indices."""
-        z = self.forward(z)
         ids = nn.functional.linear(z.transpose(1, -1), self.embedding.weight).argmax(-1).int()
         return ids.permute(0, 2, 3, 1) if ids.dim() > 3 else ids.permute(0, 2, 1)
 
     def dequantize(self, ids) -> torch.Tensor:
         """Dequantize indices to z."""
-        z = self.embedding(self.forward(ids))
+        z = self.embedding(ids)
         return z.permute(0, 4, 1, 2, 3) if z.dim() > 4 else z.permute(0, 3, 1, 2)
 
 
@@ -43,22 +43,24 @@ class LFQuantizer(nn.Identity):
 
     def __init__(self, n_e, vq_embed_dim):
         super(LFQuantizer, self).__init__()
-        self.n_e, self.vq_embed_dim = n_e, vq_embed_dim
-        self.embedding = nn.Embedding(n_e, vq_embed_dim)
+        self.groups = vq_embed_dim // int(math.log2(n_e))
+        self.n_e, self.vq_embed_dim = n_e, vq_embed_dim // self.groups
+        self.embedding = torch.nn.Embedding(n_e, self.vq_embed_dim)
         del self.embedding.weight
-        basis = 2 ** torch.arange(vq_embed_dim - 1, -1, -1, dtype=torch.int32)
+        basis = 2 ** torch.arange(self.vq_embed_dim, dtype=torch.int32)
         weight = 2 * torch.arange(n_e).unsqueeze(-1).bitwise_and(basis).ne(0).float() - 1
         self.register_buffer("basis", basis, persistent=False)
         self.embedding.register_buffer("weight", weight, persistent=False)
 
     def quantize(self, z: torch.Tensor) -> torch.Tensor:
         """Quantize z to indices."""
-        ids = self.forward(z).transpose(1, -1).gt(0).int().mul(self.basis).sum(-1)
-        return ids.permute(0, 2, 3, 1) if ids.dim() > 3 else ids.permute(0, 2, 1)
+        ids = z.transpose(1, -1).unflatten(-1, (self.groups, -1)).gt(0).int().mul(self.basis).sum(-1)  # noqa
+        ids = ids.permute(0, 2, 3, 1, 4) if ids.dim() > 4 else ids.permute(0, 2, 1, 3)
+        return ids if self.groups > 1 else ids.squeeze(-1)
 
     def dequantize(self, ids) -> torch.Tensor:
         """Dequantize indices to z."""
-        z = self.embedding(self.forward(ids))
+        z = self.embedding(ids).flatten(-2 if self.groups > 1 else -1)
         return z.permute(0, 4, 1, 2, 3) if z.dim() > 4 else z.permute(0, 3, 1, 2)
 
 
@@ -83,13 +85,12 @@ class FSQuantizer(nn.Identity):
 
     def quantize(self, z: torch.Tensor) -> torch.Tensor:
         """Quantize z to indices."""
-        z_q = self.bound(self.forward(z.transpose(1, -1))).round()
+        z_q = self.bound(z.transpose(1, -1)).round()
         ids = (z_q + self.half_width).mul(self.basis).sum(-1).int()
         return ids.permute(0, 2, 3, 1) if ids.dim() > 3 else ids.permute(0, 2, 1)
 
     def dequantize(self, ids) -> torch.Tensor:
         """Dequantize indices to z."""
-        ids = self.forward(ids)
         z_q = ids.unsqueeze(-1).floor_divide(self.basis).fmod(self.levels) - self.half_width
         z = z_q.div(self.half_width).to(self.scalar.dtype)
         return z.permute(0, 4, 1, 2, 3) if z.dim() > 4 else z.permute(0, 3, 1, 2)

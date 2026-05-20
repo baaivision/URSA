@@ -22,6 +22,7 @@ from torch import nn
 from diffusers.configuration_utils import ConfigMixin, register_to_config
 from diffusers.models.modeling_outputs import AutoencoderKLOutput
 from diffusers.models.modeling_utils import ModelMixin
+from diffusers.utils.accelerate_utils import apply_forward_hook
 
 from diffnext.models.autoencoders.modeling_utils import DiagonalGaussianDistribution
 from diffnext.models.autoencoders.modeling_utils import DecoderOutput, TilingMixin
@@ -246,23 +247,22 @@ class AutoencoderKLOpenSora(ModelMixin, ConfigMixin, TilingMixin):
         x.mul_(1 / self.config.scaling_factor)
         return x.add_(self.config.shift_factor) if self.config.shift_factor else x
 
+    @apply_forward_hook
     def encode(self, x) -> AutoencoderKLOutput:
         """Encode the input samples."""
         extra_dim = 2 if isinstance(self.quant_conv, Conv3d) and x.dim() == 4 else None
-        z = self.tiled_encoder(self.forward(x))
+        z = self.tiled_encoder(x)
         z = self.quant_conv(z)
         z = z.squeeze_(extra_dim) if extra_dim is not None else z
         posterior = DiagonalGaussianDistribution(z)
         return AutoencoderKLOutput(latent_dist=posterior)
 
+    @apply_forward_hook
     def decode(self, z) -> DecoderOutput:
         """Decode the input latents."""
         extra_dim = 2 if isinstance(self.quant_conv, Conv3d) and z.dim() == 4 else None
         z = z.unsqueeze_(extra_dim) if extra_dim is not None else z
-        z = self.post_quant_conv(self.forward(z))
+        z = self.post_quant_conv(z)
         x = self.tiled_decoder(z)
         x = x.squeeze_(extra_dim) if extra_dim is not None else x
         return DecoderOutput(sample=x)
-
-    def forward(self, x):  # NOOP.
-        return x

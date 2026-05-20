@@ -124,8 +124,9 @@ class Trainer(object):
                 The gradient accumulation steps.
 
         """
+        reuse_inputs = True if inputs else False
         for _ in range(accum_steps):
-            inputs = inputs if inputs else self.train_dataloader.next()[0]
+            inputs = inputs if reuse_inputs else self.train_dataloader.next()[0]
             outputs, losses = self.model(inputs), []
             for k, v in outputs.items():
                 if "loss" not in k and "metric" not in k:

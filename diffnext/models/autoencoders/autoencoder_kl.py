@@ -20,6 +20,7 @@ from torch import nn
 from diffusers.configuration_utils import ConfigMixin, register_to_config
 from diffusers.models.modeling_outputs import AutoencoderKLOutput
 from diffusers.models.modeling_utils import ModelMixin
+from diffusers.utils.accelerate_utils import apply_forward_hook
 
 from diffnext.models.autoencoders.modeling_utils import DecoderOutput
 from diffnext.models.autoencoders.modeling_utils import DiagonalGaussianDistribution
@@ -207,20 +208,19 @@ class AutoencoderKL(ModelMixin, ConfigMixin):
         x.mul_(1 / self.config.scaling_factor)
         return x.add_(self.config.shift_factor) if self.config.shift_factor else x
 
+    @apply_forward_hook
     def encode(self, x) -> AutoencoderKLOutput:
         """Encode the input samples."""
-        z = self.quant_conv(self.encoder(self.forward(x)))
+        z = self.quant_conv(self.encoder(x))
         posterior = self.latent_dist(z)
         return AutoencoderKLOutput(latent_dist=posterior)
 
+    @apply_forward_hook
     def decode(self, z) -> DecoderOutput:
         """Decode the input latents."""
         t = z.size(2) if z.dim() == 5 else 1
         z = z.transpose(1, 2).flatten(0, 1) if t > 1 else z
         z = z.squeeze_(2) if z.dim() == 5 else z
-        x = self.decoder(self.post_quant_conv(self.forward(z)))
+        x = self.decoder(self.post_quant_conv(z))
         x = x.view(-1, t, *x.shape[1:]).transpose(1, 2) if t > 1 else x
         return DecoderOutput(sample=x)
-
-    def forward(self, x):  # NOOP.
-        return x

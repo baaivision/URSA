@@ -76,7 +76,8 @@ class MixtureDiscreteProbPath(DiscreteProbPath):
         """
         t = t.to(self.emb).view([-1] + [1] * (x_1.dim() - 1)) if hasattr(t, "cpu") else t
         x_0 = x_1.new_empty(x_1.shape).random_(to=self.emb.shape[0], generator=self.generator)
-        return x_0.where(t.new_empty(x_1.shape).uniform_(generator=self.generator).lt(1 - t), x_1)
+        u_dist = torch.empty_like(x_1, dtype=torch.float32).uniform_(generator=self.generator)
+        return x_0.where(u_dist.lt(1 - t), x_1)
 
     def get_velocity(self, logits, x_t, t: float, x_1=None) -> torch.Tensor:
         """Return the velocity by converting the factorized posterior.
@@ -215,7 +216,15 @@ class KineticOptimalScheduler(SchedulerMixin, ConfigMixin):
     """Kinetic optimal scheduler with general discrete paths."""
 
     @register_to_config
-    def __init__(self, alpha=None, c=None, shift=1.0, eps=1e-5, **kwargs):
+    def __init__(
+        self,
+        alpha=None,
+        c=None,
+        shift=1.0,
+        eps=1e-5,
+        stochastic_sampling=False,
+        **kwargs,
+    ):
         self.alpha, self.c, self.shift, self.eps = alpha, c, shift, eps
         self.init_args, self.path, self.codebook_size = kwargs or {}, None, 0
         self.init_args.setdefault("shift", shift) if shift != 1 else None
@@ -332,16 +341,18 @@ class KineticOptimalScheduler(SchedulerMixin, ConfigMixin):
             torch.Tensor: The sample token index at time t+1, shape (bsz, ...).
         """
         self.path.generator = generator if generator else self.path.generator
-        if timestep == self.num_inference_steps - 1:
-            prev_sample = self.path.categorical(model_output.softmax(-1))
-        else:
-            t = self.timestep_to_t(timestep)
-            dt = self.timestep_to_t(timestep + 1) - t
-            v = self.path.get_velocity(model_output, sample, t)
-            u_dist = torch.empty_like(sample, dtype=v.dtype).uniform_(generator=generator)
-            jump_thresh = 1 - v.scatter_(-1, sample[..., None], 0).sum(-1).mul_(-dt).exp_()
-            prev_sample, jump_index = sample.clone(), u_dist < jump_thresh
-            prev_sample[jump_index] = self.path.categorical(v[jump_index])
+        prev_sample = self.path.categorical(model_output.softmax(-1))
+        if timestep < self.num_inference_steps - 1:
+            if self.config.stochastic_sampling:  # Consistency sampling.
+                prev_sample = self.add_noise(prev_sample, self.timestep_to_t(timestep + 1))
+            else:  # Diffusion sampling.
+                t = self.timestep_to_t(timestep)
+                dt = self.timestep_to_t(timestep + 1) - t
+                v = self.path.get_velocity(model_output, sample, t, prev_sample)
+                u_dist = torch.empty_like(sample, dtype=v.dtype).uniform_(generator=generator)
+                jump_thresh = 1 - v.scatter_(-1, sample[..., None], 0).sum(-1).mul_(-dt).exp_()
+                prev_sample, jump_index = sample.clone(), u_dist < jump_thresh
+                prev_sample[jump_index] = self.path.categorical(v[jump_index])
         if not return_dict:
             return (prev_sample,)
         return KineticOptimalSchedulerOutput(prev_sample=prev_sample)

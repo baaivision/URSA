@@ -11,7 +11,7 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-##############################################################################
+# ------------------------------------------------------------------------
 """Simple implementation of AutoEncoderKL for LTX v0.95."""
 
 from einops import rearrange
@@ -21,6 +21,7 @@ import torch.nn as nn
 from diffusers.configuration_utils import ConfigMixin, register_to_config
 from diffusers.models.modeling_outputs import AutoencoderKLOutput
 from diffusers.models.modeling_utils import ModelMixin
+from diffusers.utils.accelerate_utils import apply_forward_hook
 
 from diffnext.models.autoencoders.modeling_utils import DiagonalGaussianDistribution
 from diffnext.models.autoencoders.modeling_utils import DecoderOutput, TilingMixin
@@ -293,21 +294,20 @@ class AutoencoderKLLTXVideo(ModelMixin, ConfigMixin, TilingMixin):
         x.mul_(1 / self.config.scaling_factor)
         return x.add_(self.config.shift_factor) if self.config.shift_factor else x
 
+    @apply_forward_hook
     def encode(self, x) -> AutoencoderKLOutput:
         """Encode the input samples."""
-        z = self.tiled_encoder(self.forward(x))
+        z = self.tiled_encoder(x)
         posterior = self.latent_dist(z)
         return AutoencoderKLOutput(latent_dist=posterior)
 
+    @apply_forward_hook
     def decode(self, z, temb: torch.Tensor = None) -> DecoderOutput:
         """Decode the input latents."""
         if temb is None:
             temb = torch.tensor([0] * z.size(0), dtype=z.dtype, device=z.device)
         extra_dim = 2 if z.dim() == 4 else None
         z = z.unsqueeze_(extra_dim) if extra_dim is not None else z
-        x = self.tiled_decoder(self.forward(z), temb=temb)
+        x = self.tiled_decoder(z, temb=temb)
         x = x.squeeze_(extra_dim) if extra_dim is not None else x
         return DecoderOutput(sample=x)
-
-    def forward(self, x):  # NOOP.
-        return x

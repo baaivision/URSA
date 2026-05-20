@@ -23,6 +23,7 @@ from torch import nn
 from diffusers.configuration_utils import ConfigMixin, register_to_config
 from diffusers.models.modeling_outputs import AutoencoderKLOutput
 from diffusers.models.modeling_utils import ModelMixin
+from diffusers.utils.accelerate_utils import apply_forward_hook
 
 from diffnext.models.autoencoders.modeling_utils import IdentityDistribution
 from diffnext.models.autoencoders.modeling_utils import DecoderOutput, TilingMixin
@@ -288,22 +289,21 @@ class AutoencoderVQCosmos3D(ModelMixin, ConfigMixin, TilingMixin):
         """Unscale the input latents."""
         return x
 
+    @apply_forward_hook
     def encode(self, x) -> AutoencoderKLOutput:
         """Encode the input samples."""
-        z = self.tiled_encoder(self.forward(x))
+        z = self.tiled_encoder(x)
         z = self.quant_conv(z)
         posterior = self.latent_dist(self.quantizer.quantize(z))
         return AutoencoderKLOutput(latent_dist=posterior)
 
+    @apply_forward_hook
     def decode(self, ids) -> DecoderOutput:
         """Decode the input indices."""
         z = self.quantizer.dequantize(ids)
         extra_dim = 2 if z.dim() == 4 else None
         z = z.unsqueeze_(extra_dim) if extra_dim is not None else z
-        z = self.post_quant_conv(self.forward(z))
+        z = self.post_quant_conv(z)
         x = self.tiled_decoder(z)
         x = x.squeeze_(extra_dim) if extra_dim is not None else x
         return DecoderOutput(sample=x)
-
-    def forward(self, x):  # NOOP.
-        return x
